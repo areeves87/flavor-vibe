@@ -24,3 +24,5 @@ Requires Playwright: `.venv/bin/python -m playwright install chromium`
 - `flavor-bible-template.html` - HTML with `{{FLAVOR_DATA}}` placeholder
 - `flavor_bible_full.csv` - Source data (main, pairing columns)
 - `flavor-bible-deploy.html` - Generated output (not tracked in git)
+- `test_flavor_bible.py` - Playwright regression tests
+- `requirements.txt` - Test dependencies (playwright, pytest)
