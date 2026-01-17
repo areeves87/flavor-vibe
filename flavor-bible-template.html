@@ -315,6 +315,10 @@
                                 <button id="filter-best" class="btn btn-sm btn-outline-success">Best Only</button>
                                 <button id="filter-all" class="btn btn-sm btn-outline-secondary">Show All</button>
                             </div>
+                            <div class="filter-checkbox" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                                <input type="checkbox" id="mutual-only">
+                                <strong>Mutual Only</strong> – Show shared pairings
+                            </div>
                         </div>
                         <!-- Max Nodes Slider -->
                         <div class="slider-container">
@@ -391,6 +395,7 @@
         let activeLevels = new Set([1, 2, 3, 4]);
         let maxNodes = Infinity; // Max pairing nodes to show (Infinity = all)
         let searchTerm = '';
+        let mutualOnly = false;
 
         // --- D3 Setup ---
         const graphContainer = d3.select("#graph-container");
@@ -535,6 +540,12 @@
                 searchTerm = this.value.toLowerCase().trim();
                 applySearchHighlight();
             });
+
+            // Mutual Only toggle
+            d3.select("#mutual-only").on("change", function() {
+                mutualOnly = this.checked;
+                updateVisualization();
+            });
         }
 
         function updateFilterCheckboxes() {
@@ -649,19 +660,35 @@
         function updateGraph(selectedFlavors) {
             const inputFlavorsLower = selectedFlavors.map(f => f.toLowerCase());
 
-            // Calculate pairings with their best level (for sorting/limiting)
-            const pairingLevels = new Map(); // pairing -> best level
+            // Track which selected flavors each pairing connects to
+            const pairingConnections = new Map(); // pairing -> { levels: Map<selectedFlavor, level>, connectedTo: Set }
+
             inputFlavorsLower.forEach(fl => {
                 smallerData.forEach(row => {
                     let pairing = null;
                     if (row.main === fl) pairing = row.pairing;
                     else if (row.pairing === fl) pairing = row.main;
                     if (pairing && !inputFlavorsLower.includes(pairing)) {
-                        const currentBest = pairingLevels.get(pairing) || 0;
-                        pairingLevels.set(pairing, Math.max(currentBest, row.level || 1));
+                        if (!pairingConnections.has(pairing)) {
+                            pairingConnections.set(pairing, { levels: new Map(), connectedTo: new Set() });
+                        }
+                        const entry = pairingConnections.get(pairing);
+                        entry.connectedTo.add(fl);
+                        const currentLevel = entry.levels.get(fl) || 0;
+                        entry.levels.set(fl, Math.max(currentLevel, row.level || 1));
                     }
                 });
             });
+
+            // Filter to mutual pairings if toggle is on, then calculate best level
+            const pairingLevels = new Map();
+            for (const [pairing, entry] of pairingConnections) {
+                if (!mutualOnly || entry.connectedTo.size === inputFlavorsLower.length) {
+                    // Best level is the max across all connections
+                    const bestLevel = Math.max(...entry.levels.values());
+                    pairingLevels.set(pairing, bestLevel);
+                }
+            }
 
             // Sort pairings by level (descending) and apply maxNodes limit
             let sortedPairings = [...pairingLevels.entries()]

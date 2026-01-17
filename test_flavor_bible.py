@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 
 # Paths
 PROJECT_DIR = Path(__file__).parent
-DEPLOY_FILE = PROJECT_DIR / "flavor-bible-deploy.html"
+DEPLOY_FILE = PROJECT_DIR / "index.html"
 CSV_FILE = PROJECT_DIR / "flavor_bible_full_w_levels.csv"
 
 
@@ -51,6 +51,24 @@ def get_expected_graph(selected_flavors: list[str], smaller_data: list[dict]) ->
             edges.add(frozenset([main, pairing]))
 
     return nodes, edges
+
+
+def get_mutual_pairings(selected_flavors: list[str], smaller_data: list[dict]) -> set:
+    """Get pairings that connect to ALL selected flavors."""
+    selected = set(f.lower() for f in selected_flavors)
+    if len(selected) <= 1:
+        # With 0-1 selections, mutual is same as normal
+        return get_expected_graph(selected_flavors, smaller_data)[0] - selected
+
+    pairing_connections = {}  # pairing -> set of connected selected flavors
+    for row in smaller_data:
+        main, pairing = row["main"], row["pairing"]
+        if main in selected and pairing not in selected:
+            pairing_connections.setdefault(pairing, set()).add(main)
+        if pairing in selected and main not in selected:
+            pairing_connections.setdefault(main, set()).add(pairing)
+
+    return {p for p, conns in pairing_connections.items() if conns == selected}
 
 
 # --- Fixtures ---
@@ -210,6 +228,60 @@ class TestNodeCorrectness:
 
         assert expected_nodes == actual_nodes, \
             f"Node mismatch. Missing: {expected_nodes - actual_nodes}, Extra: {actual_nodes - expected_nodes}"
+
+
+class TestMutualOnly:
+    """Tests for Mutual Only toggle."""
+
+    def test_mutual_only_filters_pairings(self, page, flavor_data):
+        """Mutual Only should show only shared pairings."""
+        _, _, smaller_data = flavor_data
+
+        select_flavors(page, ["chicken", "lemons"])
+        normal_nodes = count_nodes(page)
+
+        # Enable Mutual Only
+        page.click("#mutual-only")
+        page.wait_for_timeout(300)
+
+        mutual_nodes = count_nodes(page)
+        expected_mutual = get_mutual_pairings(["chicken", "lemons"], smaller_data)
+
+        # Mutual should have fewer nodes (intersection < union)
+        assert mutual_nodes < normal_nodes
+        # Plus 2 for the selected ingredients themselves
+        assert mutual_nodes == len(expected_mutual) + 2
+
+    def test_mutual_only_toggle_off_restores(self, page, flavor_data):
+        """Disabling Mutual Only should restore full pairings."""
+        _, _, smaller_data = flavor_data
+
+        select_flavors(page, ["chicken", "lemons"])
+        normal_nodes = count_nodes(page)
+
+        # Enable then disable Mutual Only
+        page.click("#mutual-only")
+        page.wait_for_timeout(300)
+        page.click("#mutual-only")
+        page.wait_for_timeout(300)
+
+        restored_nodes = count_nodes(page)
+        assert restored_nodes == normal_nodes
+
+    def test_mutual_only_single_selection(self, page, flavor_data):
+        """Mutual Only with single selection should behave same as normal."""
+        _, _, smaller_data = flavor_data
+
+        select_flavors(page, ["chicken"])
+        normal_nodes = count_nodes(page)
+
+        # Enable Mutual Only
+        page.click("#mutual-only")
+        page.wait_for_timeout(300)
+
+        mutual_nodes = count_nodes(page)
+        # With single selection, mutual = normal (all pairings connect to the one selected)
+        assert mutual_nodes == normal_nodes
 
 
 if __name__ == "__main__":
