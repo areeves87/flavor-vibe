@@ -9,7 +9,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 # Paths
 PROJECT_DIR = Path(__file__).parent
 DEPLOY_FILE = PROJECT_DIR / "flavor-bible-deploy.html"
-CSV_FILE = PROJECT_DIR / "flavor_bible_full.csv"
+CSV_FILE = PROJECT_DIR / "flavor_bible_full_w_levels.csv"
 
 
 # --- Data helpers to compute expected values ---
@@ -19,7 +19,7 @@ def load_flavor_data():
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         raw_data = [
-            {"main": row["main"].lower(), "pairing": row["pairing"].lower()}
+            {"main": row["MAIN"].lower(), "pairing": row["PAIRING"].lower()}
             for row in reader
         ]
 

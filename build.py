@@ -7,7 +7,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 TEMPLATE_FILE = SCRIPT_DIR / "flavor-bible-template.html"
-CSV_FILE = SCRIPT_DIR / "flavor_bible_full.csv"
+CSV_FILE = SCRIPT_DIR / "flavor_bible_full_w_levels.csv"
 OUTPUT_FILE = SCRIPT_DIR / "flavor-bible-deploy.html"
 
 
@@ -16,7 +16,7 @@ def main():
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         data = [
-            {"main": row["main"].lower(), "pairing": row["pairing"].lower()}
+            {"main": row["MAIN"].lower(), "pairing": row["PAIRING"].lower()}
             for row in reader
         ]
 
