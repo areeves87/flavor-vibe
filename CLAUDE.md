@@ -39,3 +39,11 @@ RECOMMENDATION_LEVEL (1-4) indicates how many chefs recommend the pairing:
 | 4 | Classic | 0.2% | Thick red |
 
 Users can filter by level in the sidebar. "Best Only" shows levels 3-4.
+
+## Debugging "Missing" Connections
+
+If a pairing appears missing in the visualization:
+
+1. **Check the CSV** - Verify the pairing exists: `grep "^CHICKEN,oregano" flavor_bible_full_w_levels.csv`
+2. **Check level filters** - Most pairings are level 1 (77.6%), which are hidden by "Best Only"
+3. **Data flow**: CSV (uppercase MAIN) → build.py (lowercases all) → JSON in HTML → `smallerData` (filters to pairings where both ingredients are MAIN entries)
