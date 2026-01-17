@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flavor Bible - Explore Food Pairings</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- D3.js v7 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- JQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        #graph-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            position: relative;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #graph {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #graph:active {
+            cursor: grabbing;
+        }
+        .node circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: r 0.2s ease-in-out;
+        }
+        .node text {
+            pointer-events: none;
+            font-size: 11px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            fill: #2c3e50;
+            text-anchor: start;
+            stroke: white;
+            stroke-width: 3px;
+            stroke-linejoin: round;
+            paint-order: stroke;
+        }
+        .node .label-visible {
+             visibility: visible !important;
+             font-weight: bold;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            transition: stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
+        }
+
+        /* Highlight Styles */
+        .node.hovered circle {
+            stroke: #2c3e50;
+            stroke-width: 2.5px;
+        }
+        .node.neighbor:not(.hovered) circle {
+            stroke: #666;
+            stroke-width: 2px;
+        }
+        .link.connected-link {
+            stroke: #3498db;
+            stroke-opacity: 1;
+            stroke-width: 2.5px;
+        }
+        .dimmed {
+             opacity: 0.15;
+        }
+
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .legend {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        .legend span.legend-item {
+            margin-right: 15px;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            vertical-align: middle;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+        }
+        #loading-indicator {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }
+        .select2-container .select2-selection--multiple {
+             min-height: 38px;
+             border-radius: 4px;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .zoom-controls button {
+            display: block;
+            width: 32px;
+            height: 32px;
+            margin-bottom: 4px;
+            border: 1px solid #dee2e6;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .zoom-controls button:hover {
+            background: #f8f9fa;
+        }
+        .instructions {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <h2 class="mb-4 text-center">Explore Food Pairings from The Flavor Bible</h2>
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="flavorInput"><strong>Select base flavors:</strong></label>
+                            <select id="flavorInput" class="form-control" multiple="multiple" style="width: 100%;">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+                        <!-- Legend (Dynamic) -->
+                        <div id="legend" class="legend">
+                            <!-- Legend items generated here -->
+                        </div>
+                        <hr>
+                        <div class="instructions">
+                            <strong>How to use:</strong>
+                            <ul class="pl-3 mb-2">
+                                <li>Select ingredients above to see their pairings</li>
+                                <li>Hover over nodes to see connections</li>
+                                <li>Click gray nodes to add them</li>
+                                <li>Drag nodes to rearrange</li>
+                                <li>Scroll to zoom, drag background to pan</li>
+                            </ul>
+                        </div>
+                        <div class="mt-2">
+                            <a id="googleLink" href="#" target="_blank" class="btn btn-outline-primary btn-sm btn-block">
+                                Search Selected on Google
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Main panel -->
+            <div class="col-lg-9 col-md-8">
+                <div id="loading-indicator">Loading flavor data...</div>
+                <div id="graph-container" style="display: none;">
+                    <div class="zoom-controls">
+                        <button id="zoom-in" title="Zoom in">+</button>
+                        <button id="zoom-out" title="Zoom out">−</button>
+                        <button id="zoom-reset" title="Reset view">⟲</button>
+                    </div>
+                    <svg id="graph"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        // --- Embedded Flavor Data ---
+        const FLAVOR_DATA = {{FLAVOR_DATA}};
+
+        // --- Configuration ---
+        const CONFIG = {
+            defaultFlavors: ["chicken", "lemon"],
+            googleSearchBaseUrl: "https://www.google.com/search?q=recipe+",
+            forceChargeStrength: -150,
+            forceLinkDistance: 80,
+            selectedLabelClass: "label-visible",
+            otherGroupName: "other",
+            otherGroupColor: "#95a5a6",
+            zoomScaleExtent: [0.2, 5]
+        };
+
+        // --- Global State ---
+        let rawData = [], smallerData = [], allMains = [];
+        let simulation, currentNodes = [], currentLinks = [];
+        let linkElements, nodeElements;
+
+        // --- D3 Setup ---
+        const graphContainer = d3.select("#graph-container");
+        const svg = d3.select("#graph");
+        let width, height;
+        const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+        // --- DOM Elements ---
+        const loadingIndicator = d3.select("#loading-indicator");
+        const selectElement = $("#flavorInput");
+        const legendDiv = d3.select("#legend");
+        let mainGroup, linkGroup, nodeGroup;
+
+        // --- Zoom Setup ---
+        const zoom = d3.zoom()
+            .scaleExtent(CONFIG.zoomScaleExtent)
+            .on("zoom", zoomed);
+
+        function zoomed(event) {
+            if (mainGroup) {
+                mainGroup.attr("transform", event.transform);
+            }
+        }
+
+        // --- Initialization ---
+        function initialize() {
+            showLoading(true);
+            calculateSize();
+
+            // Apply zoom behavior to SVG
+            svg.call(zoom);
+
+            d3.select(window).on('resize.graph', calculateSizeAndUpdate);
+
+            simulation = d3.forceSimulation()
+                .force("link", d3.forceLink().id(d => d.id))
+                .force("charge", d3.forceManyBody())
+                .force("center", d3.forceCenter())
+                .force("collide", d3.forceCollide().radius(12))
+                .on("tick", ticked);
+
+            // Create main group for zooming
+            mainGroup = svg.append("g").attr("id", "main-group");
+
+            // Process embedded data
+            processData(FLAVOR_DATA);
+            setupSelect2();
+            setupEventListeners();
+
+            linkGroup = mainGroup.append("g").attr("class", "links");
+            nodeGroup = mainGroup.append("g").attr("class", "nodes");
+
+            showLoading(false);
+            calculateSize();
+            updateVisualization();
+        }
+
+        // --- Utility Functions ---
+        function showLoading(isLoading) {
+            loadingIndicator.style("display", isLoading ? "block" : "none");
+            graphContainer.style("display", isLoading ? "none" : "block");
+        }
+
+        function processData(data) {
+            rawData = data;
+            allMains = Array.from(new Set(rawData.map(d => d.main))).sort();
+            smallerData = rawData.filter(d => allMains.includes(d.pairing));
+        }
+
+        function setupSelect2() {
+            allMains.forEach(flavor => {
+                if (!selectElement.find(`option[value='${CSS.escape(flavor)}']`).length) {
+                    selectElement.append(new Option(flavor, flavor));
+                }
+            });
+            selectElement.val(CONFIG.defaultFlavors);
+            selectElement.select2({
+                placeholder: 'Type to search flavors...',
+                allowClear: true,
+                maximumSelectionLength: 10
+            });
+        }
+
+        function setupEventListeners() {
+            selectElement.on("change", () => {
+                updateVisualization();
+            });
+
+            // Zoom controls
+            d3.select("#zoom-in").on("click", () => {
+                svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+            });
+            d3.select("#zoom-out").on("click", () => {
+                svg.transition().duration(300).call(zoom.scaleBy, 0.67);
+            });
+            d3.select("#zoom-reset").on("click", () => {
+                svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+            });
+        }
+
+        function calculateSize() {
+            const newWidth = graphContainer.node().getBoundingClientRect().width;
+            const newHeight = graphContainer.node().getBoundingClientRect().height;
+
+            if (newWidth > 0 && newHeight > 0 && (width !== newWidth || height !== newHeight)) {
+                width = newWidth;
+                height = newHeight;
+                svg.attr("viewBox", `0 0 ${width} ${height}`);
+                if (simulation) {
+                    simulation.force("center", d3.forceCenter(width / 2, height / 2));
+                }
+            }
+        }
+
+        function calculateSizeAndUpdate() {
+            const oldWidth = width;
+            const oldHeight = height;
+            calculateSize();
+            if ((width !== oldWidth || height !== oldHeight) && currentNodes.length > 0 && simulation) {
+                simulation.alphaTarget(0.1).restart();
+            }
+        }
+
+        // --- Core Update Logic ---
+        function getSelectedFlavors() { return selectElement.val() || []; }
+
+        function updateVisualization() {
+            const selectedFlavors = getSelectedFlavors();
+            updateGraph(selectedFlavors);
+            updateGoogleLink(selectedFlavors);
+            updateLegend(selectedFlavors);
+        }
+
+        function updateGoogleLink(selectedFlavors) {
+            const query = selectedFlavors.join(" ");
+            d3.select("#googleLink")
+              .attr("href", `${CONFIG.googleSearchBaseUrl}${encodeURIComponent(query)}`)
+              .classed("disabled", selectedFlavors.length === 0);
+        }
+
+        function updateLegend(selectedFlavors) {
+            legendDiv.selectAll(".legend-item").remove();
+
+            if (selectedFlavors.length > 0 && legendDiv.select("p").empty()) {
+                legendDiv.insert("p", ":first-child").append("strong").text("Legend:");
+            } else if (selectedFlavors.length === 0) {
+                legendDiv.select("p").remove();
+            }
+
+            const legendItems = legendDiv.selectAll(".legend-item.selected")
+                .data(selectedFlavors, d => d);
+
+            legendItems.exit().remove();
+
+            const legendEnter = legendItems.enter().append("span").attr("class", "legend-item selected");
+            legendEnter.append("span").attr("class", "legend-color")
+                       .style("background-color", d => color(d));
+            legendEnter.append("span").text(d => d);
+
+            legendDiv.selectAll(".legend-item.other").remove();
+            const hasOtherNodes = currentNodes.some(n => n.group === CONFIG.otherGroupName);
+            if (hasOtherNodes) {
+                const otherItem = legendDiv.append("span").attr("class", "legend-item other");
+                otherItem.append("span").attr("class", "legend-color")
+                         .style("background-color", CONFIG.otherGroupColor);
+                otherItem.append("span").text("Common Pairing");
+            }
+        }
+
+        function updateGraph(selectedFlavors) {
+            const inputFlavorsLower = selectedFlavors.map(f => f.toLowerCase());
+
+            // Calculate nodes
+            const relatedPairings = new Set();
+            inputFlavorsLower.forEach(fl => {
+                smallerData.forEach(row => {
+                    if (row.main === fl) relatedPairings.add(row.pairing);
+                    if (row.pairing === fl) relatedPairings.add(row.main);
+                });
+            });
+
+            const nodeIds = new Set([...inputFlavorsLower, ...relatedPairings]);
+            const validNodeIds = [...nodeIds].filter(id => allMains.includes(id));
+            const oldNodeMap = new Map(currentNodes.map(d => [d.id, {...d}]));
+
+            currentNodes = validNodeIds.map(fl => {
+                const existingNode = oldNodeMap.get(fl);
+                const newNode = {
+                    id: fl,
+                    group: inputFlavorsLower.includes(fl) ? fl : CONFIG.otherGroupName
+                };
+                if (existingNode) {
+                    newNode.x = existingNode.x;
+                    newNode.y = existingNode.y;
+                    newNode.fx = existingNode.fx;
+                    newNode.fy = existingNode.fy;
+                } else {
+                    newNode.x = width / 2 + (Math.random() - 0.5) * width * 0.1;
+                    newNode.y = height / 2 + (Math.random() - 0.5) * height * 0.1;
+                }
+                return newNode;
+            });
+
+            // Calculate links
+            currentLinks = [];
+            const addedLinks = new Set();
+            smallerData.forEach(row => {
+                const sourceInNodes = validNodeIds.includes(row.main);
+                const targetInNodes = validNodeIds.includes(row.pairing);
+                if (sourceInNodes && targetInNodes &&
+                    (inputFlavorsLower.includes(row.main) || inputFlavorsLower.includes(row.pairing))) {
+                    const linkId1 = `${row.main}|${row.pairing}`;
+                    const linkId2 = `${row.pairing}|${row.main}`;
+                    if (!addedLinks.has(linkId1) && !addedLinks.has(linkId2)) {
+                        const sourceNode = currentNodes.find(n => n.id === row.main);
+                        const targetNode = currentNodes.find(n => n.id === row.pairing);
+                        if (sourceNode && targetNode) {
+                            currentLinks.push({ source: sourceNode, target: targetNode, value: 1 });
+                            addedLinks.add(linkId1);
+                        }
+                    }
+                }
+            });
+
+            // D3 Data Binding - Links
+            linkElements = linkGroup.selectAll("line.link")
+                .data(currentLinks, d => `${d.source.id}-${d.target.id}`);
+
+            linkElements.exit().transition().duration(300).style("opacity", 0).remove();
+
+            linkElements = linkElements.enter().append("line")
+                .attr("class", "link")
+                .style("opacity", 0)
+                .merge(linkElements);
+
+            linkElements.transition().duration(300).style("opacity", 1);
+
+            // D3 Data Binding - Nodes
+            nodeElements = nodeGroup.selectAll("g.node")
+                .data(currentNodes, d => d.id);
+
+            nodeElements.exit().transition().duration(300).style("opacity", 0).remove();
+
+            const nodeEnter = nodeElements.enter().append("g")
+                .attr("class", "node")
+                .style("opacity", 0)
+                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("click", nodeClicked)
+                .on("mouseover", handleMouseOver)
+                .on("mouseout", handleMouseOut);
+
+            nodeEnter.append("circle").attr("r", 8);
+            nodeEnter.append("text")
+                .attr("dx", 12)
+                .attr("dy", ".35em")
+                .text(d => d.id)
+                .style("visibility", "hidden");
+
+            nodeElements = nodeEnter.merge(nodeElements);
+
+            // Apply styles
+            nodeElements.transition().duration(300).style("opacity", 1);
+
+            nodeElements.select("circle")
+                .transition().duration(300)
+                .attr("fill", d => d.group === CONFIG.otherGroupName ? CONFIG.otherGroupColor : color(d.group));
+
+            nodeElements.select("text").each(function(d) {
+                const isSelected = inputFlavorsLower.includes(d.id);
+                d3.select(this)
+                  .classed(CONFIG.selectedLabelClass, isSelected)
+                  .style("visibility", isSelected ? "visible" : "hidden");
+            });
+
+            // Update simulation
+            simulation.nodes(currentNodes);
+            simulation.force("link").links(currentLinks).distance(CONFIG.forceLinkDistance);
+            simulation.force("charge").strength(CONFIG.forceChargeStrength);
+            simulation.alpha(0.8).restart();
+        }
+
+        // --- Interaction Handlers ---
+        function nodeClicked(event, d) {
+            event.stopPropagation();
+            if (d.group === CONFIG.otherGroupName && allMains.includes(d.id)) {
+                const currentSelections = getSelectedFlavors();
+                if (!currentSelections.includes(d.id)) {
+                    selectElement.val([...currentSelections, d.id]).trigger("change");
+                }
+            }
+        }
+
+        function handleMouseOver(event, d) {
+            if (event.defaultPrevented) return;
+
+            const nodeGroupElement = d3.select(this);
+            const allNodes = nodeElements;
+            const allLinks = linkElements;
+            const textElement = nodeGroupElement.select('text');
+
+            nodeGroupElement.raise();
+            textElement.style("visibility", "visible");
+
+            allNodes.classed('dimmed', true);
+            allLinks.classed('dimmed', true);
+
+            const connectedLinks = allLinks.filter(l => l.source.id === d.id || l.target.id === d.id);
+
+            const neighborNodeIds = new Set([d.id]);
+            connectedLinks.each(function(l) {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                neighborNodeIds.add(sourceId);
+                neighborNodeIds.add(targetId);
+            });
+            const neighborNodes = allNodes.filter(n => neighborNodeIds.has(n.id));
+
+            neighborNodes.classed('dimmed', false).classed('neighbor', true);
+            nodeGroupElement.classed('dimmed', false);
+            nodeGroupElement.classed('hovered', true);
+            connectedLinks.classed('dimmed', false).classed('connected-link', true);
+        }
+
+        function handleMouseOut(event, d) {
+            const allNodes = nodeElements;
+            const allLinks = linkElements;
+            const textElement = d3.select(this).select('text');
+
+            if (!textElement.classed(CONFIG.selectedLabelClass)) {
+                textElement.style("visibility", "hidden");
+            }
+            allNodes.classed('dimmed', false).classed('hovered', false).classed('neighbor', false);
+            allLinks.classed('dimmed', false).classed('connected-link', false);
+        }
+
+        // --- Drag Handlers ---
+        function dragstarted(event, d) {
+            event.sourceEvent.stopPropagation();
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            // Keep node fixed after drag
+        }
+
+        // --- Tick Function ---
+        function ticked() {
+            if (linkElements) {
+                linkElements
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+            }
+            if (nodeElements) {
+                nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+        }
+
+        // --- Start ---
+        initialize();
+    </script>
+</body>
+</html>
