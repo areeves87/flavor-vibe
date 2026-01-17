@@ -67,6 +67,28 @@
             transition: stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
         }
 
+        /* Level-based link styling */
+        .link.level-1 {
+            stroke: #ccc;
+            stroke-width: 1px;
+            stroke-opacity: 0.4;
+        }
+        .link.level-2 {
+            stroke: #999;
+            stroke-width: 1.5px;
+            stroke-opacity: 0.6;
+        }
+        .link.level-3 {
+            stroke: #3498db;
+            stroke-width: 2.5px;
+            stroke-opacity: 0.8;
+        }
+        .link.level-4 {
+            stroke: #e74c3c;
+            stroke-width: 4px;
+            stroke-opacity: 1;
+        }
+
         /* Highlight Styles */
         .node.hovered circle {
             stroke: #2c3e50;
@@ -77,9 +99,23 @@
             stroke-width: 2px;
         }
         .link.connected-link {
-            stroke: #3498db;
             stroke-opacity: 1;
-            stroke-width: 2.5px;
+        }
+        .link.connected-link.level-1 {
+            stroke: #666;
+            stroke-width: 1.5px;
+        }
+        .link.connected-link.level-2 {
+            stroke: #555;
+            stroke-width: 2px;
+        }
+        .link.connected-link.level-3 {
+            stroke: #2980b9;
+            stroke-width: 3px;
+        }
+        .link.connected-link.level-4 {
+            stroke: #c0392b;
+            stroke-width: 5px;
         }
         .dimmed {
              opacity: 0.15;
@@ -143,6 +179,40 @@
             color: #6c757d;
             margin-top: 10px;
         }
+        .filter-controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        .filter-controls label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .filter-checkbox {
+            margin-bottom: 5px;
+        }
+        .filter-checkbox input {
+            margin-right: 6px;
+        }
+        .filter-buttons {
+            margin-top: 10px;
+        }
+        .filter-buttons .btn {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .level-line {
+            display: inline-block;
+            height: 3px;
+            width: 20px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .level-line.level-1 { background: #ccc; height: 1px; }
+        .level-line.level-2 { background: #999; height: 2px; }
+        .level-line.level-3 { background: #3498db; height: 3px; }
+        .level-line.level-4 { background: #e74c3c; height: 4px; }
     </style>
 </head>
 <body>
@@ -162,6 +232,30 @@
                         <!-- Legend (Dynamic) -->
                         <div id="legend" class="legend">
                             <!-- Legend items generated here -->
+                        </div>
+                        <!-- Filter Controls -->
+                        <div class="filter-controls">
+                            <label>Filter by strength:</label>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="filter-level-4" checked>
+                                <span class="level-line level-4"></span>Classic (highly recommended)
+                            </div>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="filter-level-3" checked>
+                                <span class="level-line level-3"></span>Strong
+                            </div>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="filter-level-2" checked>
+                                <span class="level-line level-2"></span>Moderate
+                            </div>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="filter-level-1" checked>
+                                <span class="level-line level-1"></span>Basic
+                            </div>
+                            <div class="filter-buttons">
+                                <button id="filter-best" class="btn btn-sm btn-outline-success">Best Only</button>
+                                <button id="filter-all" class="btn btn-sm btn-outline-secondary">Show All</button>
+                            </div>
                         </div>
                         <hr>
                         <div class="instructions">
@@ -221,6 +315,7 @@
         let rawData = [], smallerData = [], allMains = [];
         let simulation, currentNodes = [], currentLinks = [];
         let linkElements, nodeElements;
+        let activeLevels = new Set([1, 2, 3, 4]);
 
         // --- D3 Setup ---
         const graphContainer = d3.select("#graph-container");
@@ -318,6 +413,62 @@
             });
             d3.select("#zoom-reset").on("click", () => {
                 svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+            });
+
+            // Level filter checkboxes
+            [1, 2, 3, 4].forEach(level => {
+                d3.select(`#filter-level-${level}`).on("change", function() {
+                    if (this.checked) {
+                        activeLevels.add(level);
+                    } else {
+                        activeLevels.delete(level);
+                    }
+                    applyLevelFilter();
+                });
+            });
+
+            // Filter buttons
+            d3.select("#filter-best").on("click", () => {
+                activeLevels = new Set([3, 4]);
+                updateFilterCheckboxes();
+                applyLevelFilter();
+            });
+            d3.select("#filter-all").on("click", () => {
+                activeLevels = new Set([1, 2, 3, 4]);
+                updateFilterCheckboxes();
+                applyLevelFilter();
+            });
+        }
+
+        function updateFilterCheckboxes() {
+            [1, 2, 3, 4].forEach(level => {
+                d3.select(`#filter-level-${level}`).property("checked", activeLevels.has(level));
+            });
+        }
+
+        function applyLevelFilter() {
+            if (!linkElements || !nodeElements) return;
+
+            const selectedFlavors = getSelectedFlavors().map(f => f.toLowerCase());
+
+            // Show/hide links based on level
+            linkElements.style("display", d => activeLevels.has(d.level) ? null : "none");
+
+            // Find nodes that have at least one visible connection
+            const connectedNodeIds = new Set(selectedFlavors);
+            linkElements.each(function(d) {
+                if (activeLevels.has(d.level)) {
+                    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+                    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+                    connectedNodeIds.add(sourceId);
+                    connectedNodeIds.add(targetId);
+                }
+            });
+
+            // Show/hide orphaned nodes (except selected nodes which should always show)
+            nodeElements.style("display", d => {
+                if (selectedFlavors.includes(d.id)) return null;
+                return connectedNodeIds.has(d.id) ? null : "none";
             });
         }
 
@@ -438,7 +589,12 @@
                         const sourceNode = currentNodes.find(n => n.id === row.main);
                         const targetNode = currentNodes.find(n => n.id === row.pairing);
                         if (sourceNode && targetNode) {
-                            currentLinks.push({ source: sourceNode, target: targetNode, value: 1 });
+                            currentLinks.push({
+                                source: sourceNode,
+                                target: targetNode,
+                                value: 1,
+                                level: row.level || 1
+                            });
                             addedLinks.add(linkId1);
                         }
                     }
@@ -452,11 +608,17 @@
             linkElements.exit().transition().duration(300).style("opacity", 0).remove();
 
             linkElements = linkElements.enter().append("line")
-                .attr("class", "link")
+                .attr("class", d => `link level-${d.level}`)
                 .style("opacity", 0)
                 .merge(linkElements);
 
+            // Update level classes for existing links
+            linkElements.attr("class", d => `link level-${d.level}`);
+
             linkElements.transition().duration(300).style("opacity", 1);
+
+            // Apply current filter
+            applyLevelFilter();
 
             // D3 Data Binding - Nodes
             nodeElements = nodeGroup.selectAll("g.node")

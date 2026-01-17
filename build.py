@@ -16,7 +16,11 @@ def main():
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         data = [
-            {"main": row["MAIN"].lower(), "pairing": row["PAIRING"].lower()}
+            {
+                "main": row["MAIN"].lower(),
+                "pairing": row["PAIRING"].lower(),
+                "level": int(row["RECOMMENDATION_LEVEL"])
+            }
             for row in reader
         ]
 
