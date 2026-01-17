@@ -14,7 +14,7 @@ The graph can get overwhelming with many nodes. Here are approaches to help filt
 
 - [ ] **Category Filtering** - Tag ingredients with categories (protein, vegetable, herb, spice, dairy, fruit, etc.). Add checkboxes to show/hide categories. Requires enriching the CSV data.
 
-- [ ] **"Mutual Only" Toggle** - When multiple ingredients are selected, show only their shared pairings (ingredients that pair with ALL selected items). Great for building recipes.
+- [x] **"Mutual Only" Toggle** - When multiple ingredients are selected, show only their shared pairings (ingredients that pair with ALL selected items). Great for building recipes.
 
 - [ ] **Connection Count Filter** - "Hide nodes with < N connections" slider. Removes outliers and leaves the most versatile pairings visible.
 
