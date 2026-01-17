@@ -213,6 +213,65 @@
         .level-line.level-2 { background: #999; height: 2px; }
         .level-line.level-3 { background: #3498db; height: 3px; }
         .level-line.level-4 { background: #e74c3c; height: 4px; }
+
+        /* Search highlight */
+        .node.search-match circle {
+            stroke: #f39c12;
+            stroke-width: 3px;
+        }
+        .node.search-match text {
+            visibility: visible !important;
+            fill: #d35400;
+            font-weight: bold;
+        }
+
+        /* Slider styling */
+        .slider-container {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        .slider-container label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .slider-value {
+            font-weight: normal;
+            color: #666;
+        }
+        #maxNodesSlider {
+            width: 100%;
+        }
+
+        /* Search box */
+        .search-container {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        .search-container label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+        #nodeSearch {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #nodeSearch:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .search-hint {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -256,6 +315,20 @@
                                 <button id="filter-best" class="btn btn-sm btn-outline-success">Best Only</button>
                                 <button id="filter-all" class="btn btn-sm btn-outline-secondary">Show All</button>
                             </div>
+                        </div>
+                        <!-- Max Nodes Slider -->
+                        <div class="slider-container">
+                            <label>Max pairings: <span id="maxNodesValue" class="slider-value">All</span></label>
+                            <input type="range" id="maxNodesSlider" min="5" max="100" value="100" step="5">
+                            <div class="filter-buttons">
+                                <button id="slider-reset" class="btn btn-sm btn-outline-secondary">Show All</button>
+                            </div>
+                        </div>
+                        <!-- Search/Highlight -->
+                        <div class="search-container">
+                            <label>Find in graph:</label>
+                            <input type="text" id="nodeSearch" placeholder="Type to highlight...">
+                            <div class="search-hint">Highlights matching nodes</div>
                         </div>
                         <hr>
                         <div class="instructions">
@@ -316,6 +389,8 @@
         let simulation, currentNodes = [], currentLinks = [];
         let linkElements, nodeElements;
         let activeLevels = new Set([1, 2, 3, 4]);
+        let maxNodes = Infinity; // Max pairing nodes to show (Infinity = all)
+        let searchTerm = '';
 
         // --- D3 Setup ---
         const graphContainer = d3.select("#graph-container");
@@ -438,6 +513,28 @@
                 updateFilterCheckboxes();
                 applyLevelFilter();
             });
+
+            // Max nodes slider
+            const slider = d3.select("#maxNodesSlider");
+            const sliderValue = d3.select("#maxNodesValue");
+            slider.on("input", function() {
+                const val = +this.value;
+                maxNodes = val >= 100 ? Infinity : val;
+                sliderValue.text(maxNodes === Infinity ? "All" : maxNodes);
+                updateVisualization();
+            });
+            d3.select("#slider-reset").on("click", () => {
+                maxNodes = Infinity;
+                slider.property("value", 100);
+                sliderValue.text("All");
+                updateVisualization();
+            });
+
+            // Search/highlight
+            d3.select("#nodeSearch").on("input", function() {
+                searchTerm = this.value.toLowerCase().trim();
+                applySearchHighlight();
+            });
         }
 
         function updateFilterCheckboxes() {
@@ -469,6 +566,14 @@
             nodeElements.style("display", d => {
                 if (selectedFlavors.includes(d.id)) return null;
                 return connectedNodeIds.has(d.id) ? null : "none";
+            });
+        }
+
+        function applySearchHighlight() {
+            if (!nodeElements) return;
+            nodeElements.classed("search-match", d => {
+                if (!searchTerm) return false;
+                return d.id.toLowerCase().includes(searchTerm);
             });
         }
 
@@ -544,16 +649,30 @@
         function updateGraph(selectedFlavors) {
             const inputFlavorsLower = selectedFlavors.map(f => f.toLowerCase());
 
-            // Calculate nodes
-            const relatedPairings = new Set();
+            // Calculate pairings with their best level (for sorting/limiting)
+            const pairingLevels = new Map(); // pairing -> best level
             inputFlavorsLower.forEach(fl => {
                 smallerData.forEach(row => {
-                    if (row.main === fl) relatedPairings.add(row.pairing);
-                    if (row.pairing === fl) relatedPairings.add(row.main);
+                    let pairing = null;
+                    if (row.main === fl) pairing = row.pairing;
+                    else if (row.pairing === fl) pairing = row.main;
+                    if (pairing && !inputFlavorsLower.includes(pairing)) {
+                        const currentBest = pairingLevels.get(pairing) || 0;
+                        pairingLevels.set(pairing, Math.max(currentBest, row.level || 1));
+                    }
                 });
             });
 
-            const nodeIds = new Set([...inputFlavorsLower, ...relatedPairings]);
+            // Sort pairings by level (descending) and apply maxNodes limit
+            let sortedPairings = [...pairingLevels.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([pairing]) => pairing);
+
+            if (maxNodes !== Infinity) {
+                sortedPairings = sortedPairings.slice(0, maxNodes);
+            }
+
+            const nodeIds = new Set([...inputFlavorsLower, ...sortedPairings]);
             const validNodeIds = [...nodeIds].filter(id => allMains.includes(id));
             const oldNodeMap = new Map(currentNodes.map(d => [d.id, {...d}]));
 
@@ -654,12 +773,27 @@
                 .transition().duration(300)
                 .attr("fill", d => d.group === CONFIG.otherGroupName ? CONFIG.otherGroupColor : color(d.group));
 
+            // Calculate which nodes have strong (level 3-4) connections
+            const strongConnectionNodes = new Set();
+            currentLinks.forEach(link => {
+                if (link.level >= 3) {
+                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                    strongConnectionNodes.add(sourceId);
+                    strongConnectionNodes.add(targetId);
+                }
+            });
+
             nodeElements.select("text").each(function(d) {
                 const isSelected = inputFlavorsLower.includes(d.id);
+                const hasStrongConnection = strongConnectionNodes.has(d.id);
                 d3.select(this)
                   .classed(CONFIG.selectedLabelClass, isSelected)
-                  .style("visibility", isSelected ? "visible" : "hidden");
+                  .style("visibility", (isSelected || hasStrongConnection) ? "visible" : "hidden");
             });
+
+            // Re-apply search highlight after nodes update
+            applySearchHighlight();
 
             // Update simulation
             simulation.nodes(currentNodes);
