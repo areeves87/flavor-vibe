@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build script to generate flavor-bible-deploy.html from template and CSV data."""
+"""Build script to generate index.html from template and CSV data."""
 
 import csv
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent
 TEMPLATE_FILE = SCRIPT_DIR / "flavor-bible-template.html"
 CSV_FILE = SCRIPT_DIR / "flavor_bible_full_w_levels.csv"
-OUTPUT_FILE = SCRIPT_DIR / "flavor-bible-deploy.html"
+OUTPUT_FILE = SCRIPT_DIR / "index.html"
 
 
 def main():
