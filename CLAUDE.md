@@ -26,3 +26,16 @@ Requires Playwright: `.venv/bin/python -m playwright install chromium`
 - `flavor-bible-deploy.html` - Generated output (not tracked in git)
 - `test_flavor_bible.py` - Playwright regression tests
 - `requirements.txt` - Test dependencies (playwright, pytest)
+
+## Recommendation Levels
+
+RECOMMENDATION_LEVEL (1-4) indicates how many chefs recommend the pairing:
+
+| Level | Description | Distribution | Visual |
+|-------|-------------|--------------|--------|
+| 1 | Basic | 77.6% | Thin gray |
+| 2 | Moderate | 17.6% | Medium gray |
+| 3 | Strong | 4.5% | Blue |
+| 4 | Classic | 0.2% | Thick red |
+
+Users can filter by level in the sidebar. "Best Only" shows levels 3-4.
