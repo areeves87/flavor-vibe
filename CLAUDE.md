@@ -8,7 +8,7 @@ Interactive visualization of food pairings based on The Flavor Bible. Users sele
 python3 build.py
 ```
 
-Reads `flavor_bible_full.csv` and generates `flavor-bible-deploy.html` (self-contained, no server required).
+Reads `flavor_bible_full_w_levels.csv` and generates `flavor-bible-deploy.html` (self-contained, no server required).
 
 ## Test
 
@@ -22,7 +22,7 @@ Requires Playwright: `.venv/bin/python -m playwright install chromium`
 
 - `build.py` - Injects CSV data into template
 - `flavor-bible-template.html` - HTML with `{{FLAVOR_DATA}}` placeholder
-- `flavor_bible_full.csv` - Source data (main, pairing columns)
+- `flavor_bible_full_w_levels.csv` - Source data (MAIN, PAIRING, RECOMMENDATION_LEVEL columns)
 - `flavor-bible-deploy.html` - Generated output (not tracked in git)
 - `test_flavor_bible.py` - Playwright regression tests
 - `requirements.txt` - Test dependencies (playwright, pytest)
