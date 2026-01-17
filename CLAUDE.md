@@ -2,6 +2,10 @@
 
 Interactive visualization of food pairings based on The Flavor Bible. Users select ingredients to explore a network graph of complementary flavors.
 
+## Claude Instructions
+
+Run git commands separately, not chained with `&&`. This makes it easier to review each command before it runs.
+
 ## Build
 
 ```bash
