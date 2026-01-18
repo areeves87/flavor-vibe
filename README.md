@@ -2,6 +2,8 @@
 
 An interactive visualization of food pairings based on The Flavor Bible. Select ingredients to explore a network graph of complementary flavors.
 
+**Try it live:** https://areeves87.github.io/flavor-vibe/
+
 ## Usage
 
 ### Build
