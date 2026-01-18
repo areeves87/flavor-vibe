@@ -647,14 +647,7 @@
                        .style("background-color", d => color(d));
             legendEnter.append("span").text(d => d);
 
-            legendDiv.selectAll(".legend-item.other").remove();
-            const hasOtherNodes = currentNodes.some(n => n.group === CONFIG.otherGroupName);
-            if (hasOtherNodes) {
-                const otherItem = legendDiv.append("span").attr("class", "legend-item other");
-                otherItem.append("span").attr("class", "legend-color")
-                         .style("background-color", CONFIG.otherGroupColor);
-                otherItem.append("span").text("Common Pairing");
-            }
+            // Removed "Common Pairing" legend entry - pairings now inherit parent colors
         }
 
         function updateGraph(selectedFlavors) {
@@ -705,9 +698,18 @@
 
             currentNodes = validNodeIds.map(fl => {
                 const existingNode = oldNodeMap.get(fl);
+                const isSelected = inputFlavorsLower.includes(fl);
+
+                // Get parent connections for pairing nodes
+                let parents = [];
+                if (!isSelected && pairingConnections.has(fl)) {
+                    parents = [...pairingConnections.get(fl).connectedTo];
+                }
+
                 const newNode = {
                     id: fl,
-                    group: inputFlavorsLower.includes(fl) ? fl : CONFIG.otherGroupName
+                    group: isSelected ? fl : CONFIG.otherGroupName,
+                    parents: parents
                 };
                 if (existingNode) {
                     newNode.x = existingNode.x;
@@ -798,7 +800,15 @@
 
             nodeElements.select("circle")
                 .transition().duration(300)
-                .attr("fill", d => d.group === CONFIG.otherGroupName ? CONFIG.otherGroupColor : color(d.group));
+                .attr("fill", d => {
+                    if (d.group !== CONFIG.otherGroupName) {
+                        return color(d.group);  // Selected node: own color
+                    }
+                    // Pairing node: use first parent's color, or gray if no parents
+                    return d.parents && d.parents.length > 0 ? color(d.parents[0]) : CONFIG.otherGroupColor;
+                })
+                .attr("stroke-width", d => d.parents && d.parents.length > 1 ? 3 : 1.5)
+                .attr("stroke", d => d.parents && d.parents.length > 1 ? "#2c3e50" : "#fff");
 
             // Calculate which nodes have strong (level 3-4) connections
             const strongConnectionNodes = new Set();
